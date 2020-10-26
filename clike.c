@@ -3,6 +3,7 @@
 
 typedef struct token
 {
+    int  Id;
     char Lexeme[32];
 } token;
 
@@ -23,11 +24,16 @@ int IsLetterOr_(char CurrentCharacter)
 void Lexer(token* Tokens, char *SourceCode, int SourceCodeSize)
 {
     char *SourceCodePointer = SourceCode;
+
     int Index;    
+    int IdCounter = 0;
+
     char PreviousCharacter = ' ';
     char CurrentCharacter;
+
     int TokenIndex = -1;
     int LexemeIndex = 0;
+
     for (Index = 0; Index < SourceCodeSize; Index++)
     {   
         CurrentCharacter = SourceCodePointer[Index];
@@ -52,6 +58,8 @@ void Lexer(token* Tokens, char *SourceCode, int SourceCodeSize)
             TokenIndex++;
             LexemeIndex = 0;
             Tokens[TokenIndex].Lexeme[LexemeIndex] = CurrentCharacter;
+
+            Tokens[TokenIndex].Id = IdCounter++;
         }
         
         else if(CurrentCharacter != ' ' && CurrentCharacter != '\n' && CurrentCharacter != '\r')
@@ -59,15 +67,17 @@ void Lexer(token* Tokens, char *SourceCode, int SourceCodeSize)
             TokenIndex++;
             LexemeIndex = 0;
             Tokens[TokenIndex].Lexeme[LexemeIndex] = CurrentCharacter;
+
+            Tokens[TokenIndex].Id = IdCounter++;
             //printf("%c %d\n", CurrentCharacter, TokenIndex);
         }
 
         PreviousCharacter = CurrentCharacter; 
     }
 
-    for(Index = 0; Index < 20; Index++)
+    for(TokenIndex = 0; TokenIndex < 20; TokenIndex++)
     {
-        printf("%s\n", Tokens[Index].Lexeme);
+        printf("%2d - %s\n", Tokens[TokenIndex].Id, Tokens[TokenIndex].Lexeme);
     }
 }
 

@@ -1,4 +1,4 @@
 int main_f == ()
 {
-    return 2;
+    return (2);
 }
