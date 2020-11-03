@@ -15,54 +15,143 @@ typedef enum
     //OPENCHEVRON,      // <
     //CLOSECHEVRON,     // >
     RETURN,           // return
-    CONSTANT,         // [-Max, Max]
-    SEMICOLON         // ;
+    NUMBER,           // [-Max, Max]
+    SEMICOLON,        // ;
+    EndOfFile         // End of file
 } token_type;
 
-typedef struct 
+typedef struct TOKEN_STRUCT
 {
     int  Id;
     token_type TokenType;
     char Lexeme[32];
+    struct TOKEN_STRUCT *NextToken;
 } token;
 
-int IsNumber(char CurrentCharacter)
+token *AllocateNewToken()
 {
-    if('1' <= CurrentCharacter && CurrentCharacter <= '9')
-    {
-        return 1;
-    }
-    return 0;
+    token *Token = (token *)calloc(1, sizeof(struct TOKEN_STRUCT));
+    
+    Token->Id         = 0;
+    Token->TokenType  = 0;
+    //Token->Lexeme     = (void*)0;
+    Token->NextToken  = (void*)0;
+    
+    return Token;
 }
 
-int IsLetterOr_(char CurrentCharacter)
+typedef enum
 {
-    if(
-        ('a' <= CurrentCharacter && CurrentCharacter <= 'z') ||
-        ('A' <= CurrentCharacter && CurrentCharacter <= 'Z') ||
-        IsNumber(CurrentCharacter) || 
-        '_' == CurrentCharacter
-      )
-    {
-        return 1;
-    }
-    return 0;
+    AST_NOP,
+    AST_Program,
+    AST_FunctionDefinition,
+    AST_Statement,
+    AST_Expression
+} ast_type;
+
+typedef struct
+{
+    ast_type ASTType;
+
+} ast;
+
+int IsDigit(char Character)
+{
+    return ('1' <= Character && Character <= '9') ? 1 : 0;
 }
 
-void Lexer(token* Tokens, char *SourceCode, int SourceCodeSize)
+int IsLowerCase(char Character)
+{
+    return ('a' <= Character && Character <= 'z') ? 1 : 0;
+}
+
+int IsUpperCase(char Character)
+{
+    return ('A' <= Character && Character <= 'Z') ? 1 : 0;
+}
+
+int IsAlphabet(char Character)
+{
+    return (IsLowerCase(Character) || IsUpperCase(Character)) ? 1 : 0;
+}
+
+int IsLetter(char Character)
+{
+    return (IsAlphabet(Character) || IsDigit(Character)) ? 1 : 0;
+}
+
+int IsLetterOr_(char Character)
+{
+    return (IsLetter(Character) || '_' == Character) ? 1 : 0;
+}
+
+int StringComparison(char *FirstString, char* SecondString)
+{
+    int Index;
+    for(Index = 0; SecondString[Index]; Index++)
+    {
+        if(FirstString[Index] != SecondString[Index])
+        {
+            return 0;
+        }
+    }
+    /* 
+    `for` block return 0 means not valid i.e. string didn't match
+    `for` block no return means "i" and "in" are not valid but "int" and "inte" are valid
+    so FirstString[Index] is used to eliminate "inte"
+    */
+    return (FirstString[Index]) ? 0 : 1;
+}
+
+int IsStringANumber(char *String)
+{
+    for(int LexemeIndex = 0; String[LexemeIndex]; LexemeIndex++)
+    {
+        if(!IsDigit(String[LexemeIndex]))
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+char * TokenTypeToString(int Type)
+{
+    switch (Type)
+    {
+        case INVALIED         : return "INVALIED";         
+        case IDENTIFIER       : return "IDENTIFIER";      
+        case INTEGER          : return "INTEGER";         
+        case OPENPARENTHESIS  : return "OPENPARENTHESIS"; 
+        case CLOSEPARENTHESIS : return "CLOSEPARENTHESIS";
+        case OPENBRACE        : return "OPENBRACE";       
+        case CLOSEBRACE       : return "CLOSEBRACE";      
+        //case OPENBRACKET      : return "OPENBRACKET";     
+        //case CLOSEBRACKET     : return "CLOSEBRACKET";    
+        //case OPENCHEVRON      : return "OPENCHEVRON";     
+        //case CLOSECHEVRON     : return "CLOSECHEVRON";    
+        case RETURN           : return "RETURN";          
+        case NUMBER           : return "NUMBER";        
+        case SEMICOLON        : return "SEMICOLON";      
+        case EndOfFile        : return "EndOfFile";        
+    }
+}
+
+token *Lexer(char *SourceCode, int SourceCodeSize)
 {
     char *SourceCodePointer = SourceCode;
 
-    int Index;    
     int IdCounter = 0;
 
     char PreviousCharacter = ' ';
     char CurrentCharacter;
 
-    int TokenIndex = -1;
     int LexemeIndex = 0;
 
-    for (Index = 0; Index < SourceCodeSize; Index++)
+    token *TokenIndex = AllocateNewToken();
+    token *TokensHead = TokenIndex;
+
+    for (int Index = 0; Index < SourceCodeSize; Index++)
     {   
         CurrentCharacter = SourceCodePointer[Index];
 
@@ -70,7 +159,7 @@ void Lexer(token* Tokens, char *SourceCode, int SourceCodeSize)
         if(IsLetterOr_(PreviousCharacter) && IsLetterOr_(CurrentCharacter))
         {
             LexemeIndex++;
-            Tokens[TokenIndex].Lexeme[LexemeIndex] = CurrentCharacter;
+            TokenIndex->Lexeme[LexemeIndex] = CurrentCharacter;
         }
         
         /*else if(PreviousCharacter == '=' && CurrentCharacter == '=')
@@ -83,112 +172,93 @@ void Lexer(token* Tokens, char *SourceCode, int SourceCodeSize)
         else if(!IsLetterOr_(PreviousCharacter) && IsLetterOr_(CurrentCharacter))
         {
             //printf("%c\n", CurrentCharacter);
-            TokenIndex++;
             LexemeIndex = 0;
-            Tokens[TokenIndex].Lexeme[LexemeIndex] = CurrentCharacter;
-
-            Tokens[TokenIndex].Id = IdCounter++;
-            Tokens[TokenIndex].TokenType = IDENTIFIER;
+            TokenIndex->NextToken = AllocateNewToken();
+            TokenIndex->NextToken->Id = IdCounter++;
+            TokenIndex->NextToken->TokenType = IDENTIFIER;
+            TokenIndex->NextToken->Lexeme[LexemeIndex] = CurrentCharacter;
+            TokenIndex = TokenIndex->NextToken;                
         }
         
         else if(CurrentCharacter != ' ' && CurrentCharacter != '\n' && CurrentCharacter != '\r' && CurrentCharacter != '\t')
         {
-            TokenIndex++;
             LexemeIndex = 0;
-            Tokens[TokenIndex].Lexeme[LexemeIndex] = CurrentCharacter;
-
-            Tokens[TokenIndex].Id = IdCounter++;
+            TokenIndex->NextToken = AllocateNewToken();
+            TokenIndex->NextToken->Id = IdCounter++;
+            TokenIndex->NextToken->Lexeme[LexemeIndex] = CurrentCharacter;
 
             if(CurrentCharacter == ';')
             {
-                Tokens[TokenIndex].TokenType = SEMICOLON;
+                TokenIndex->NextToken->TokenType = SEMICOLON;
             }
             else if(CurrentCharacter == '(')
             {
-                Tokens[TokenIndex].TokenType = OPENPARENTHESIS;
+                TokenIndex->NextToken->TokenType = OPENPARENTHESIS;
             }
             else if(CurrentCharacter == ')')
             {
-                Tokens[TokenIndex].TokenType = CLOSEPARENTHESIS;
+                TokenIndex->NextToken->TokenType = CLOSEPARENTHESIS;
             }
             else if(CurrentCharacter == '{')
             {
-                Tokens[TokenIndex].TokenType = OPENBRACE;
+                TokenIndex->NextToken->TokenType = OPENBRACE;
             }
             else if(CurrentCharacter == '}')
             {
-                Tokens[TokenIndex].TokenType = CLOSEBRACE;
+                TokenIndex->NextToken->TokenType = CLOSEBRACE;
             }
+
+            TokenIndex = TokenIndex->NextToken;
             //printf("%c %d\n", CurrentCharacter, TokenIndex);
         }
 
-        PreviousCharacter = CurrentCharacter; 
+        PreviousCharacter = CurrentCharacter;
     }
+    token *Temp = AllocateNewToken();
+    Temp->Id = IdCounter++;
+    Temp->TokenType = EndOfFile;
+    TokenIndex->NextToken = Temp;
+    TokenIndex = TokenIndex->NextToken;
+    // Tokens[TokenIndex].Lexeme       // No Lexeme for EOF(End of File)
 
     char *Int    = "int";
     char *Return = "return";
 
-    char Keyworlds[][6] = { "int", "return" }; 
+    //char Keyworlds[][6] = { "int", "return" };
 
-    for(TokenIndex = 0; TokenIndex < 20; TokenIndex++)
+    for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != EndOfFile; TokenIndex = TokenIndex->NextToken)
     {
-        if(Tokens[TokenIndex].TokenType == IDENTIFIER)
+        if(TokenIndex->TokenType == IDENTIFIER)
         {
-            int IsKeywordMinMatched = 1;
-            for(LexemeIndex = 0; Int[LexemeIndex]; LexemeIndex++)
+            char *CurrentLexeme = TokenIndex->Lexeme;
+            if(StringComparison(CurrentLexeme, Int))
             {
-                if(Tokens[TokenIndex].Lexeme[LexemeIndex] != Int[LexemeIndex])
-                {
-                    IsKeywordMinMatched = 0;
-                }
+                TokenIndex->TokenType = INTEGER;
             }
-            /* 
-            (IsKeywordMinMatched == 0) means not valid i.e. string didn't match
-            (IsKeywordMinMatched == 1) means "i" is not valid but "int" and "inte" are valid
-            so !Tokens[TokenIndex].Lexeme[LexemeIndex] is used to eliminate "inte"
-            */
-            if(IsKeywordMinMatched && !Tokens[TokenIndex].Lexeme[LexemeIndex])
+            else if(StringComparison(CurrentLexeme, Return))
             {
-                Tokens[TokenIndex].TokenType = INTEGER;
-                continue;
+                TokenIndex->TokenType = RETURN;
             }
-
-            IsKeywordMinMatched = 1;
-            for(LexemeIndex = 0; Return[LexemeIndex]; LexemeIndex++)
+            else if(IsStringANumber(CurrentLexeme))
             {
-                if(Tokens[TokenIndex].Lexeme[LexemeIndex] != Return[LexemeIndex])
-                {
-                    IsKeywordMinMatched = 0;
-                }
-            }
-            if(IsKeywordMinMatched && !Tokens[TokenIndex].Lexeme[LexemeIndex])
-            {
-                Tokens[TokenIndex].TokenType = RETURN;
-                continue;
-            }
-
-            // ----------------------------- Constant----------------------------------
-            int IsCurrentCharacterANumber = 1;
-            for(LexemeIndex = 0; Tokens[TokenIndex].Lexeme[LexemeIndex]; LexemeIndex++)
-            {
-                if(!IsNumber(Tokens[TokenIndex].Lexeme[LexemeIndex]))
-                {
-                    IsCurrentCharacterANumber = 0;
-                }
-                //printf("%s\n", Tokens[TokenIndex].Lexeme);
-            }
-            if(IsCurrentCharacterANumber)
-            {
-                Tokens[TokenIndex].TokenType = CONSTANT;
+                TokenIndex->TokenType = NUMBER;
             }
         }
     }
 
-    for(TokenIndex = 0; TokenIndex < 20; TokenIndex++)
+    /*for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != EndOfFile; TokenIndex = TokenIndex->NextToken)
     {
-        printf("%2d - %2d - %s\n", 
-               Tokens[TokenIndex].Id, Tokens[TokenIndex].TokenType, Tokens[TokenIndex].Lexeme);
-    }
+        char *TypeString = TokenTypeToString(TokenIndex->TokenType);
+        printf("[Lexer]:   Id=>`%d`,   type=>%16s,   value=> `%s`\n", 
+               TokenIndex->Id, TypeString, TokenIndex->Lexeme);
+    }*/
+
+    return TokensHead->NextToken;
+}
+
+void Parser(token *Tokens)
+{
+
 }
 
 int main(int ArgumentCount, char** ArgumentValues) 
@@ -213,10 +283,20 @@ int main(int ArgumentCount, char** ArgumentValues)
     
     fclose(SourceFile);
 
+    // --------------------------- Lexer ---------------------------
+    token *TokensHead;
+    TokensHead = Lexer(SourceCode, SourceFileSize);
+    for(token *TokenIndex = TokensHead; TokenIndex->TokenType != EndOfFile; TokenIndex = TokenIndex->NextToken)
+    {
+        char *TypeString = TokenTypeToString(TokenIndex->TokenType);
+        printf("[Lexer]:   Id=>`%d`,   type=>%16s,   value=> `%s`\n", 
+               TokenIndex->Id, TypeString, TokenIndex->Lexeme);
+    }
+    // --------------------------- Lexer ---------------------------
+
     // ---------------------------
 
-    token Tokens[20] = {};
-    Lexer(Tokens, SourceCode, SourceFileSize);
+    Parser(TokensHead);
 
     // ---------------------------
 

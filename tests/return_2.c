@@ -1,4 +1,4 @@
-int main_f1 ()
-{ 222
-    return (2);
+] int main ()
+{
+    return 2;
 }
