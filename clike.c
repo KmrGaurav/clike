@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef enum 
+typedef enum
 {
     INVALIED,
     IDENTIFIER,
-    INTEGER,          // int
+    INT_KEYWORD,      // int
     OPENPARENTHESIS,  // (
     CLOSEPARENTHESIS, // )
     OPENBRACE,        // {
@@ -14,10 +14,10 @@ typedef enum
     //CLOSEBRACKET,     // ]
     //OPENCHEVRON,      // <
     //CLOSECHEVRON,     // >
-    RETURN,           // return
+    RETURN_KEYWORD,   // return
     NUMBER,           // [-Max, Max]
     SEMICOLON,        // ;
-    EndOfFile         // End of file
+    END_OF_FILE       // End of file
 } token_type;
 
 typedef struct TOKEN_STRUCT
@@ -43,17 +43,27 @@ token *AllocateNewToken()
 typedef enum
 {
     AST_NOP,
-    AST_Program,
-    AST_FunctionDefinition,
-    AST_Statement,
-    AST_Expression
+    AST_PROGRAM,
+    AST_FUNCTION_DEFINITION,
+    AST_STATEMENT,
+    AST_EXPRESSION
 } ast_type;
 
-typedef struct
+typedef struct AST_STRUCT
 {
     ast_type ASTType;
-
+    struct AST_STRUCT *Child;
 } ast;
+
+ast *AllocateNewAST(ast_type ASTType)
+{
+    ast *AST = (ast *)calloc(1, sizeof(struct AST_STRUCT));
+
+    AST->ASTType = ASTType;
+    AST->Child   = (void*)0;
+
+    return AST;
+}
 
 int IsDigit(char Character)
 {
@@ -121,7 +131,7 @@ char * TokenTypeToString(int Type)
     {
         case INVALIED         : return "INVALIED";         
         case IDENTIFIER       : return "IDENTIFIER";      
-        case INTEGER          : return "INTEGER";         
+        case INT_KEYWORD          : return "INT_KEYWORD";         
         case OPENPARENTHESIS  : return "OPENPARENTHESIS"; 
         case CLOSEPARENTHESIS : return "CLOSEPARENTHESIS";
         case OPENBRACE        : return "OPENBRACE";       
@@ -130,10 +140,22 @@ char * TokenTypeToString(int Type)
         //case CLOSEBRACKET     : return "CLOSEBRACKET";    
         //case OPENCHEVRON      : return "OPENCHEVRON";     
         //case CLOSECHEVRON     : return "CLOSECHEVRON";    
-        case RETURN           : return "RETURN";          
+        case RETURN_KEYWORD           : return "RETURN_KEYWORD";          
         case NUMBER           : return "NUMBER";        
         case SEMICOLON        : return "SEMICOLON";      
-        case EndOfFile        : return "EndOfFile";        
+        case END_OF_FILE        : return "END_OF_FILE";        
+    }
+}
+
+char * ASTTypeToString(int Type)
+{
+    switch (Type)
+    { 
+        case AST_NOP                 : return "AST_NOP";
+        case AST_PROGRAM             : return "AST_PROGRAM";
+        case AST_FUNCTION_DEFINITION : return "AST_FUNCTION_DEFINITION";
+        case AST_STATEMENT           : return "AST_STATEMENT";
+        case AST_EXPRESSION          : return "AST_EXPRESSION";
     }
 }
 
@@ -148,8 +170,8 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
 
     int LexemeIndex = 0;
 
-    token *TokenIndex = AllocateNewToken();
-    token *TokensHead = TokenIndex;
+    token *TokensHead = AllocateNewToken();
+    token *TokenIndex = TokensHead;
 
     for (int Index = 0; Index < SourceCodeSize; Index++)
     {   
@@ -216,7 +238,7 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
     }
     token *Temp = AllocateNewToken();
     Temp->Id = IdCounter++;
-    Temp->TokenType = EndOfFile;
+    Temp->TokenType = END_OF_FILE;
     TokenIndex->NextToken = Temp;
     TokenIndex = TokenIndex->NextToken;
     // Tokens[TokenIndex].Lexeme       // No Lexeme for EOF(End of File)
@@ -226,18 +248,18 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
 
     //char Keyworlds[][6] = { "int", "return" };
 
-    for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != EndOfFile; TokenIndex = TokenIndex->NextToken)
+    for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != END_OF_FILE; TokenIndex = TokenIndex->NextToken)
     {
         if(TokenIndex->TokenType == IDENTIFIER)
         {
             char *CurrentLexeme = TokenIndex->Lexeme;
             if(StringComparison(CurrentLexeme, Int))
             {
-                TokenIndex->TokenType = INTEGER;
+                TokenIndex->TokenType = INT_KEYWORD;
             }
             else if(StringComparison(CurrentLexeme, Return))
             {
-                TokenIndex->TokenType = RETURN;
+                TokenIndex->TokenType = RETURN_KEYWORD;
             }
             else if(IsStringANumber(CurrentLexeme))
             {
@@ -246,19 +268,70 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
         }
     }
 
-    /*for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != EndOfFile; TokenIndex = TokenIndex->NextToken)
+    /*for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != END_OF_FILE; TokenIndex = TokenIndex->NextToken)
     {
         char *TypeString = TokenTypeToString(TokenIndex->TokenType);
         printf("[Lexer]:   Id=>`%d`,   type=>%16s,   value=> `%s`\n", 
                TokenIndex->Id, TypeString, TokenIndex->Lexeme);
     }*/
 
-    return TokensHead->NextToken;
+    return TokensHead;
 }
 
-void Parser(token *Tokens)
+void Parser_AdvanceAndVerifyToken(token **Token, token_type TokenType)
 {
+    *Token = (*Token)->NextToken;
+    if((*Token)->TokenType != TokenType)
+    {
+        printf("[Parser]: Expected token type: %s and it is: %s\n", 
+               TokenTypeToString(TokenType), TokenTypeToString((*Token)->TokenType));
+        exit(-1);
+    }
+}
 
+ast *Parser_ParseExpression(token **Tokens)
+{
+    Parser_AdvanceAndVerifyToken(Tokens, NUMBER);
+
+    ast *AST = AllocateNewAST(AST_EXPRESSION);
+
+    return AST;
+}
+
+ast *Parser_ParseStatement(token **Tokens)
+{
+    Parser_AdvanceAndVerifyToken(Tokens, RETURN_KEYWORD);
+
+    ast *AST = AllocateNewAST(AST_STATEMENT);
+    AST->Child = Parser_ParseExpression(Tokens);
+
+    Parser_AdvanceAndVerifyToken(Tokens, SEMICOLON);
+
+    return AST;
+}
+
+ast *Parser_ParseFunction(token **Tokens)
+{
+    Parser_AdvanceAndVerifyToken(Tokens, INT_KEYWORD);
+    Parser_AdvanceAndVerifyToken(Tokens, IDENTIFIER);
+    Parser_AdvanceAndVerifyToken(Tokens, OPENPARENTHESIS);
+    Parser_AdvanceAndVerifyToken(Tokens, CLOSEPARENTHESIS);
+    Parser_AdvanceAndVerifyToken(Tokens, OPENBRACE);
+
+    ast *AST = AllocateNewAST(AST_FUNCTION_DEFINITION);
+    AST->Child = Parser_ParseStatement(Tokens);
+    
+    Parser_AdvanceAndVerifyToken(Tokens, CLOSEBRACE);
+
+    return AST;
+}
+
+ast *Parser(token *Tokens)
+{
+    ast *ASTRoot = AllocateNewAST(AST_PROGRAM);
+    ASTRoot->Child = Parser_ParseFunction(&Tokens);
+
+    return ASTRoot;
 }
 
 int main(int ArgumentCount, char** ArgumentValues) 
@@ -286,19 +359,27 @@ int main(int ArgumentCount, char** ArgumentValues)
     // --------------------------- Lexer ---------------------------
     token *TokensHead;
     TokensHead = Lexer(SourceCode, SourceFileSize);
-    for(token *TokenIndex = TokensHead; TokenIndex->TokenType != EndOfFile; TokenIndex = TokenIndex->NextToken)
+#if 0//DEBUG
+    for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != END_OF_FILE; TokenIndex = TokenIndex->NextToken)
     {
         char *TypeString = TokenTypeToString(TokenIndex->TokenType);
         printf("[Lexer]:   Id=>`%d`,   type=>%16s,   value=> `%s`\n", 
                TokenIndex->Id, TypeString, TokenIndex->Lexeme);
     }
+#endif
     // --------------------------- Lexer ---------------------------
 
-    // ---------------------------
-
-    Parser(TokensHead);
-
-    // ---------------------------
+    // --------------------------- Parser ---------------------------
+    ast *ASTRoot;
+    ASTRoot = Parser(TokensHead);
+#if 1//DEBUG
+    for(ast *ASTIndex = ASTRoot; ASTIndex; ASTIndex = ASTIndex->Child)
+    {
+        char *TypeString = ASTTypeToString(ASTIndex->ASTType);
+        printf("[Parser]: %s\n", TypeString);
+    }
+#endif
+    // --------------------------- Parser ---------------------------
 
     free(SourceCode);
 
