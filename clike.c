@@ -23,6 +23,7 @@ typedef enum
 typedef struct TOKEN_STRUCT
 {
     int  Id;
+    int LineNumber;
     token_type TokenType;
     char Lexeme[32];
     struct TOKEN_STRUCT *NextToken;
@@ -67,7 +68,7 @@ ast *AllocateNewAST(ast_type ASTType)
 
 int IsDigit(char Character)
 {
-    return ('1' <= Character && Character <= '9') ? 1 : 0;
+    return ('0' <= Character && Character <= '9') ? 1 : 0;
 }
 
 int IsLowerCase(char Character)
@@ -125,13 +126,28 @@ int IsStringANumber(char *String)
     return 1;
 }
 
+int StringToNumber(char *String)
+{
+    int Number = 0;
+
+    for(int Index = 0; String[Index]; Index++)
+    {
+        char CurrentCharacter = String[Index];
+        Number = Number*10 + CurrentCharacter - '0';
+    }
+
+        printf("%d\n", Number);
+
+    return Number;
+}
+
 char * TokenTypeToString(int Type)
 {
     switch (Type)
     {
         case INVALIED         : return "INVALIED";         
         case IDENTIFIER       : return "IDENTIFIER";      
-        case INT_KEYWORD          : return "INT_KEYWORD";         
+        case INT_KEYWORD      : return "INT_KEYWORD";         
         case OPENPARENTHESIS  : return "OPENPARENTHESIS"; 
         case CLOSEPARENTHESIS : return "CLOSEPARENTHESIS";
         case OPENBRACE        : return "OPENBRACE";       
@@ -143,7 +159,7 @@ char * TokenTypeToString(int Type)
         case RETURN_KEYWORD           : return "RETURN_KEYWORD";          
         case NUMBER           : return "NUMBER";        
         case SEMICOLON        : return "SEMICOLON";      
-        case END_OF_FILE        : return "END_OF_FILE";        
+        case END_OF_FILE      : return "END_OF_FILE";        
     }
 }
 
@@ -164,6 +180,7 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
     char *SourceCodePointer = SourceCode;
 
     int IdCounter = 0;
+    int SourceCodeLineNumber = 1;
 
     char PreviousCharacter = ' ';
     char CurrentCharacter;
@@ -197,16 +214,21 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
             LexemeIndex = 0;
             TokenIndex->NextToken = AllocateNewToken();
             TokenIndex->NextToken->Id = IdCounter++;
+            TokenIndex->NextToken->LineNumber = SourceCodeLineNumber;
             TokenIndex->NextToken->TokenType = IDENTIFIER;
             TokenIndex->NextToken->Lexeme[LexemeIndex] = CurrentCharacter;
             TokenIndex = TokenIndex->NextToken;                
         }
-        
-        else if(CurrentCharacter != ' ' && CurrentCharacter != '\n' && CurrentCharacter != '\r' && CurrentCharacter != '\t')
+        else if(CurrentCharacter == '\n')
+        {
+            SourceCodeLineNumber++;
+        }
+        else if(CurrentCharacter != ' ' && CurrentCharacter != '\r' && CurrentCharacter != '\t')
         {
             LexemeIndex = 0;
             TokenIndex->NextToken = AllocateNewToken();
             TokenIndex->NextToken->Id = IdCounter++;
+            TokenIndex->NextToken->LineNumber = SourceCodeLineNumber;
             TokenIndex->NextToken->Lexeme[LexemeIndex] = CurrentCharacter;
 
             if(CurrentCharacter == ';')
@@ -283,8 +305,9 @@ void Parser_AdvanceAndVerifyToken(token **Token, token_type TokenType)
     *Token = (*Token)->NextToken;
     if((*Token)->TokenType != TokenType)
     {
-        printf("[Parser]: Expected token type: %s and it is: %s\n", 
-               TokenTypeToString(TokenType), TokenTypeToString((*Token)->TokenType));
+        printf("[Parser]: In file %s at line:%d error at `%s`\n          Expected token type: %s and it is: %s i.e. %s\n",
+                __FILE__, (*Token)->LineNumber, (*Token)->Lexeme,
+                TokenTypeToString(TokenType), TokenTypeToString((*Token)->TokenType), (*Token)->Lexeme);
         exit(-1);
     }
 }
@@ -292,6 +315,8 @@ void Parser_AdvanceAndVerifyToken(token **Token, token_type TokenType)
 ast *Parser_ParseExpression(token **Tokens)
 {
     Parser_AdvanceAndVerifyToken(Tokens, NUMBER);
+
+    int Number = StringToNumber((*Tokens)->Lexeme);
 
     ast *AST = AllocateNewAST(AST_EXPRESSION);
 
@@ -359,12 +384,12 @@ int main(int ArgumentCount, char** ArgumentValues)
     // --------------------------- Lexer ---------------------------
     token *TokensHead;
     TokensHead = Lexer(SourceCode, SourceFileSize);
-#if 0//DEBUG
+#if 1//DEBUG
     for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != END_OF_FILE; TokenIndex = TokenIndex->NextToken)
     {
         char *TypeString = TokenTypeToString(TokenIndex->TokenType);
-        printf("[Lexer]:   Id=>`%d`,   type=>%16s,   value=> `%s`\n", 
-               TokenIndex->Id, TypeString, TokenIndex->Lexeme);
+        printf("[Lexer]:   Id: %d,   Line: %d,   type:%16s,   value: `%s`\n", 
+               TokenIndex->Id, TokenIndex->LineNumber, TypeString, TokenIndex->Lexeme);
     }
 #endif
     // --------------------------- Lexer ---------------------------

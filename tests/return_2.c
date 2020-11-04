@@ -1,4 +1,4 @@
-int main ()
+int main 1()
 {
-    return 2;
+    return 1206;
 }
