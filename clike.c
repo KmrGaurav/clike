@@ -1,23 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef enum
 {
-    INVALIED,
-    IDENTIFIER,
-    INT_KEYWORD,      // int
-    OPENPARENTHESIS,  // (
-    CLOSEPARENTHESIS, // )
-    OPENBRACE,        // {
-    CLOSEBRACE,       // }
-    //OPENBRACKET,      // [
-    //CLOSEBRACKET,     // ]
-    //OPENCHEVRON,      // <
-    //CLOSECHEVRON,     // >
-    RETURN_KEYWORD,   // return
-    NUMBER,           // [-Max, Max]
-    SEMICOLON,        // ;
-    END_OF_FILE       // End of file
+    LEX_INVALIED,
+    LEX_IDENTIFIER,
+    LEX_INT_KEYWORD,      // int
+    LEX_OPENPARENTHESIS,  // (
+    LEX_CLOSEPARENTHESIS, // )
+    LEX_OPENBRACE,        // {
+    LEX_CLOSEBRACE,       // }
+    //LEX_OPENBRACKET,      // [
+    //LEX_CLOSEBRACKET,     // ]
+    //LEX_OPENCHEVRON,      // <
+    //LEX_CLOSECHEVRON,     // >
+    LEX_RETURN_KEYWORD,   // return
+    LEX_NUMBER,           // [-Max, Max]
+    LEX_SEMICOLON,        // ;
+    LEX_END_OF_FILE       // End of file
 } token_type;
 
 typedef struct TOKEN_STRUCT
@@ -50,9 +51,18 @@ typedef enum
     AST_EXPRESSION
 } ast_type;
 
+typedef struct AST_FUNCTION_DEFINITION_STRUCT
+{
+    char *FunctionName;
+} ast_function_definition_struct;
+
 typedef struct AST_STRUCT
 {
     ast_type ASTType;
+    union
+    {
+        ast_function_definition_struct ASTFuntionDefinitionStruct;     
+    };
     struct AST_STRUCT *Child;
 } ast;
 
@@ -61,6 +71,11 @@ ast *AllocateNewAST(ast_type ASTType)
     ast *AST = (ast *)calloc(1, sizeof(struct AST_STRUCT));
 
     AST->ASTType = ASTType;
+    if(AST->ASTType == AST_FUNCTION_DEFINITION)
+    {
+        //AST->ASTFuntionDefinitionStruct.FunctionName = "hello"; 
+    }
+
     AST->Child   = (void*)0;
 
     return AST;
@@ -136,30 +151,33 @@ int StringToNumber(char *String)
         Number = Number*10 + CurrentCharacter - '0';
     }
 
-        printf("%d\n", Number);
-
     return Number;
+}
+
+void StringConcatenate(char *String1, char *String2)
+{
+    strcat(String1, String2);
 }
 
 char * TokenTypeToString(int Type)
 {
     switch (Type)
     {
-        case INVALIED         : return "INVALIED";         
-        case IDENTIFIER       : return "IDENTIFIER";      
-        case INT_KEYWORD      : return "INT_KEYWORD";         
-        case OPENPARENTHESIS  : return "OPENPARENTHESIS"; 
-        case CLOSEPARENTHESIS : return "CLOSEPARENTHESIS";
-        case OPENBRACE        : return "OPENBRACE";       
-        case CLOSEBRACE       : return "CLOSEBRACE";      
+        case LEX_INVALIED         : return "LEX_INVALIED";         
+        case LEX_IDENTIFIER       : return "LEX_IDENTIFIER";      
+        case LEX_INT_KEYWORD      : return "LEX_INT_KEYWORD";         
+        case LEX_OPENPARENTHESIS  : return "LEX_OPENPARENTHESIS"; 
+        case LEX_CLOSEPARENTHESIS : return "LEX_CLOSEPARENTHESIS";
+        case LEX_OPENBRACE        : return "LEX_OPENBRACE";       
+        case LEX_CLOSEBRACE       : return "LEX_CLOSEBRACE";      
         //case OPENBRACKET      : return "OPENBRACKET";     
         //case CLOSEBRACKET     : return "CLOSEBRACKET";    
         //case OPENCHEVRON      : return "OPENCHEVRON";     
         //case CLOSECHEVRON     : return "CLOSECHEVRON";    
-        case RETURN_KEYWORD           : return "RETURN_KEYWORD";          
-        case NUMBER           : return "NUMBER";        
-        case SEMICOLON        : return "SEMICOLON";      
-        case END_OF_FILE      : return "END_OF_FILE";        
+        case LEX_RETURN_KEYWORD           : return "LEX_RETURN_KEYWORD";          
+        case LEX_NUMBER           : return "LEX_NUMBER";        
+        case LEX_SEMICOLON        : return "LEX_SEMICOLON";      
+        case LEX_END_OF_FILE      : return "LEX_END_OF_FILE";        
     }
 }
 
@@ -215,7 +233,7 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
             TokenIndex->NextToken = AllocateNewToken();
             TokenIndex->NextToken->Id = IdCounter++;
             TokenIndex->NextToken->LineNumber = SourceCodeLineNumber;
-            TokenIndex->NextToken->TokenType = IDENTIFIER;
+            TokenIndex->NextToken->TokenType = LEX_IDENTIFIER;
             TokenIndex->NextToken->Lexeme[LexemeIndex] = CurrentCharacter;
             TokenIndex = TokenIndex->NextToken;                
         }
@@ -233,23 +251,23 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
 
             if(CurrentCharacter == ';')
             {
-                TokenIndex->NextToken->TokenType = SEMICOLON;
+                TokenIndex->NextToken->TokenType = LEX_SEMICOLON;
             }
             else if(CurrentCharacter == '(')
             {
-                TokenIndex->NextToken->TokenType = OPENPARENTHESIS;
+                TokenIndex->NextToken->TokenType = LEX_OPENPARENTHESIS;
             }
             else if(CurrentCharacter == ')')
             {
-                TokenIndex->NextToken->TokenType = CLOSEPARENTHESIS;
+                TokenIndex->NextToken->TokenType = LEX_CLOSEPARENTHESIS;
             }
             else if(CurrentCharacter == '{')
             {
-                TokenIndex->NextToken->TokenType = OPENBRACE;
+                TokenIndex->NextToken->TokenType = LEX_OPENBRACE;
             }
             else if(CurrentCharacter == '}')
             {
-                TokenIndex->NextToken->TokenType = CLOSEBRACE;
+                TokenIndex->NextToken->TokenType = LEX_CLOSEBRACE;
             }
 
             TokenIndex = TokenIndex->NextToken;
@@ -260,7 +278,7 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
     }
     token *Temp = AllocateNewToken();
     Temp->Id = IdCounter++;
-    Temp->TokenType = END_OF_FILE;
+    Temp->TokenType = LEX_END_OF_FILE;
     TokenIndex->NextToken = Temp;
     TokenIndex = TokenIndex->NextToken;
     // Tokens[TokenIndex].Lexeme       // No Lexeme for EOF(End of File)
@@ -270,27 +288,27 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
 
     //char Keyworlds[][6] = { "int", "return" };
 
-    for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != END_OF_FILE; TokenIndex = TokenIndex->NextToken)
+    for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != LEX_END_OF_FILE; TokenIndex = TokenIndex->NextToken)
     {
-        if(TokenIndex->TokenType == IDENTIFIER)
+        if(TokenIndex->TokenType == LEX_IDENTIFIER)
         {
             char *CurrentLexeme = TokenIndex->Lexeme;
             if(StringComparison(CurrentLexeme, Int))
             {
-                TokenIndex->TokenType = INT_KEYWORD;
+                TokenIndex->TokenType = LEX_INT_KEYWORD;
             }
             else if(StringComparison(CurrentLexeme, Return))
             {
-                TokenIndex->TokenType = RETURN_KEYWORD;
+                TokenIndex->TokenType = LEX_RETURN_KEYWORD;
             }
             else if(IsStringANumber(CurrentLexeme))
             {
-                TokenIndex->TokenType = NUMBER;
+                TokenIndex->TokenType = LEX_NUMBER;
             }
         }
     }
 
-    /*for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != END_OF_FILE; TokenIndex = TokenIndex->NextToken)
+    /*for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != LEX_END_OF_FILE; TokenIndex = TokenIndex->NextToken)
     {
         char *TypeString = TokenTypeToString(TokenIndex->TokenType);
         printf("[Lexer]:   Id=>`%d`,   type=>%16s,   value=> `%s`\n", 
@@ -314,7 +332,7 @@ void Parser_AdvanceAndVerifyToken(token **Token, token_type TokenType)
 
 ast *Parser_ParseExpression(token **Tokens)
 {
-    Parser_AdvanceAndVerifyToken(Tokens, NUMBER);
+    Parser_AdvanceAndVerifyToken(Tokens, LEX_NUMBER);
 
     int Number = StringToNumber((*Tokens)->Lexeme);
 
@@ -325,28 +343,30 @@ ast *Parser_ParseExpression(token **Tokens)
 
 ast *Parser_ParseStatement(token **Tokens)
 {
-    Parser_AdvanceAndVerifyToken(Tokens, RETURN_KEYWORD);
+    Parser_AdvanceAndVerifyToken(Tokens, LEX_RETURN_KEYWORD);
 
     ast *AST = AllocateNewAST(AST_STATEMENT);
     AST->Child = Parser_ParseExpression(Tokens);
 
-    Parser_AdvanceAndVerifyToken(Tokens, SEMICOLON);
+    Parser_AdvanceAndVerifyToken(Tokens, LEX_SEMICOLON);
 
     return AST;
 }
 
 ast *Parser_ParseFunction(token **Tokens)
 {
-    Parser_AdvanceAndVerifyToken(Tokens, INT_KEYWORD);
-    Parser_AdvanceAndVerifyToken(Tokens, IDENTIFIER);
-    Parser_AdvanceAndVerifyToken(Tokens, OPENPARENTHESIS);
-    Parser_AdvanceAndVerifyToken(Tokens, CLOSEPARENTHESIS);
-    Parser_AdvanceAndVerifyToken(Tokens, OPENBRACE);
-
     ast *AST = AllocateNewAST(AST_FUNCTION_DEFINITION);
+
+    Parser_AdvanceAndVerifyToken(Tokens, LEX_INT_KEYWORD);
+    Parser_AdvanceAndVerifyToken(Tokens, LEX_IDENTIFIER);
+    AST->ASTFuntionDefinitionStruct.FunctionName = (*Tokens)->Lexeme;
+    Parser_AdvanceAndVerifyToken(Tokens, LEX_OPENPARENTHESIS);
+    Parser_AdvanceAndVerifyToken(Tokens, LEX_CLOSEPARENTHESIS);
+    Parser_AdvanceAndVerifyToken(Tokens, LEX_OPENBRACE);
+
     AST->Child = Parser_ParseStatement(Tokens);
     
-    Parser_AdvanceAndVerifyToken(Tokens, CLOSEBRACE);
+    Parser_AdvanceAndVerifyToken(Tokens, LEX_CLOSEBRACE);
 
     return AST;
 }
@@ -359,33 +379,82 @@ ast *Parser(token *Tokens)
     return ASTRoot;
 }
 
+void PrettyPrintAST(ast *AST, int Indent)
+{
+    if(AST)
+    {
+        char *TypeString = ASTTypeToString(AST->ASTType);
+        for(int IndentIndex = 0; Indent>1 && IndentIndex < Indent*4; IndentIndex++)
+        {
+            printf(" ");
+        }
+        if(Indent) printf("\u2514\u2500\u2500\u2500");
+        printf("%s\n", TypeString);
+        PrettyPrintAST(AST->Child, Indent + 1);
+    }
+
+    return;
+}
+
+char *Generator(ast *AST)
+{
+    char *AssemblyCode = (char*)calloc(0, sizeof(char));
+    
+    if(AST)
+    {
+        char *FurtherAssemblyCode = (char*)calloc(25, sizeof(char));
+        if(AST->ASTType == AST_EXPRESSION)
+        {
+            sprintf(FurtherAssemblyCode, "    mov $2, %%eax\n    ret\n");
+            StringConcatenate(AssemblyCode, FurtherAssemblyCode);
+        }
+        else if(AST->ASTType == AST_FUNCTION_DEFINITION)
+        {
+            sprintf(FurtherAssemblyCode, "%s:\n", AST->ASTFuntionDefinitionStruct.FunctionName);
+            StringConcatenate(AssemblyCode, FurtherAssemblyCode);
+        }
+        else if(AST->ASTType == AST_PROGRAM)
+        {
+            sprintf(FurtherAssemblyCode, "    .globl main\n");
+            StringConcatenate(AssemblyCode, FurtherAssemblyCode);
+        }
+        FurtherAssemblyCode = Generator(AST->Child);
+        StringConcatenate(AssemblyCode, FurtherAssemblyCode);
+        free(FurtherAssemblyCode);
+    }
+
+    return AssemblyCode;
+    
+    /*sprintf(AssemblyCode, ".globl main\nmain:\nmov $%d, %%eax\nret\n", 2);
+    return AssemblyCode;*/
+}
+
 int main(int ArgumentCount, char** ArgumentValues) 
 {
-    if(ArgumentCount > 2)
+    if(ArgumentCount != 3)
     {
         printf("Invalid Argument Count i.e. %d\n", ArgumentCount);
         return 0;
     }
 
     char* SourceFileName = ArgumentValues[1];
+    FILE * SourceCodeFile = fopen(SourceFileName, "r");
 
-    FILE * SourceFile = fopen(SourceFileName, "r");
-
-    fseek(SourceFile, 0L, SEEK_END);
-    int SourceFileSize = ftell(SourceFile);
-    fseek(SourceFile, 0L, SEEK_SET);
+    fseek(SourceCodeFile, 0L, SEEK_END);
+    int SourceFileSize = ftell(SourceCodeFile);
+    fseek(SourceCodeFile, 0L, SEEK_SET);
 
     char* SourceCode = (char*)calloc(SourceFileSize, sizeof(char));
 
-    fread(SourceCode, sizeof(char), SourceFileSize, SourceFile);
+    fread(SourceCode, sizeof(char), SourceFileSize, SourceCodeFile);
     
-    fclose(SourceFile);
+    fclose(SourceCodeFile);
 
     // --------------------------- Lexer ---------------------------
     token *TokensHead;
     TokensHead = Lexer(SourceCode, SourceFileSize);
-#if 1//DEBUG
-    for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != END_OF_FILE; TokenIndex = TokenIndex->NextToken)
+#if 0//DEBUG
+    for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != LEX_END_OF_FILE; TokenIndex = TokenIndex->NextToken)
     {
         char *TypeString = TokenTypeToString(TokenIndex->TokenType);
         printf("[Lexer]:   Id: %d,   Line: %d,   type:%16s,   value: `%s`\n", 
@@ -393,20 +462,30 @@ int main(int ArgumentCount, char** ArgumentValues)
     }
 #endif
     // --------------------------- Lexer ---------------------------
-
+    free(SourceCode);
     // --------------------------- Parser ---------------------------
     ast *ASTRoot;
     ASTRoot = Parser(TokensHead);
 #if 1//DEBUG
-    for(ast *ASTIndex = ASTRoot; ASTIndex; ASTIndex = ASTIndex->Child)
-    {
-        char *TypeString = ASTTypeToString(ASTIndex->ASTType);
-        printf("[Parser]: %s\n", TypeString);
-    }
+    printf("[Parser]:\n");
+    PrettyPrintAST(ASTRoot, 0);
 #endif
     // --------------------------- Parser ---------------------------
 
-    free(SourceCode);
+    // --------------------------- Code Generator ---------------------------
+    char *GeneratedAssemblyCode = Generator(ASTRoot);
+#if 1//DEBUG
+    printf("[Code Generator]:\n");
+    printf("%s", GeneratedAssemblyCode);
+#endif
+    // --------------------------- Code Generator ---------------------------
+
+    char* AssemblyFileName = ArgumentValues[2];
+    FILE *AssemblyCodeFile = fopen(AssemblyFileName, "w");
+
+    fprintf(AssemblyCodeFile, "%s", GeneratedAssemblyCode);
+
+    fclose(AssemblyCodeFile);
 
     return 0;
 }
