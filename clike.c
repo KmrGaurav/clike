@@ -6,19 +6,22 @@ typedef enum
 {
     LEX_INVALIED,
     LEX_IDENTIFIER,
-    LEX_INT_KEYWORD,      // int
-    LEX_OPENPARENTHESIS,  // (
-    LEX_CLOSEPARENTHESIS, // )
-    LEX_OPENBRACE,        // {
-    LEX_CLOSEBRACE,       // }
-    //LEX_OPENBRACKET,      // [
-    //LEX_CLOSEBRACKET,     // ]
-    //LEX_OPENCHEVRON,      // <
-    //LEX_CLOSECHEVRON,     // >
-    LEX_RETURN_KEYWORD,   // return
-    LEX_NUMBER,           // [-Max, Max]
-    LEX_SEMICOLON,        // ;
-    LEX_END_OF_FILE       // End of file
+    LEX_INT_KEYWORD,        // int
+    LEX_OPENPARENTHESIS,    // (
+    LEX_CLOSEPARENTHESIS,   // )
+    LEX_OPENBRACE,          // {
+    LEX_CLOSEBRACE,         // }
+    //LEX_OPENBRACKET,        // [
+    //LEX_CLOSEBRACKET,       // ]
+    //LEX_OPENCHEVRON,        // <
+    //LEX_CLOSECHEVRON,       // >
+    LEX_RETURN_KEYWORD,     // return
+    LEX_NUMBER,             // [-Max, Max]
+    LEX_NEGATION,           // -
+    LEX_BITWISE_COMPLEMENT, // ~
+    LEX_LOGICAL_NEGATION,   // !
+    LEX_SEMICOLON,          // ;
+    LEX_END_OF_FILE         // End of file
 } token_type;
 
 typedef struct TOKEN_STRUCT
@@ -176,21 +179,27 @@ char * TokenTypeToString(int Type)
 {
     switch (Type)
     {
-        case LEX_INVALIED         : return "LEX_INVALIED";         
-        case LEX_IDENTIFIER       : return "LEX_IDENTIFIER";      
-        case LEX_INT_KEYWORD      : return "LEX_INT_KEYWORD";         
-        case LEX_OPENPARENTHESIS  : return "LEX_OPENPARENTHESIS"; 
-        case LEX_CLOSEPARENTHESIS : return "LEX_CLOSEPARENTHESIS";
-        case LEX_OPENBRACE        : return "LEX_OPENBRACE";       
-        case LEX_CLOSEBRACE       : return "LEX_CLOSEBRACE";      
-        //case OPENBRACKET      : return "OPENBRACKET";     
-        //case CLOSEBRACKET     : return "CLOSEBRACKET";    
-        //case OPENCHEVRON      : return "OPENCHEVRON";     
-        //case CLOSECHEVRON     : return "CLOSECHEVRON";    
-        case LEX_RETURN_KEYWORD   : return "LEX_RETURN_KEYWORD";          
-        case LEX_NUMBER           : return "LEX_NUMBER";        
-        case LEX_SEMICOLON        : return "LEX_SEMICOLON";      
-        case LEX_END_OF_FILE      : return "LEX_END_OF_FILE";        
+        case LEX_INVALIED            : return "LEX_INVALIED";         
+        case LEX_IDENTIFIER          : return "LEX_IDENTIFIER";      
+        case LEX_INT_KEYWORD         : return "LEX_INT_KEYWORD";         
+        case LEX_OPENPARENTHESIS     : return "LEX_OPENPARENTHESIS"; 
+        case LEX_CLOSEPARENTHESIS    : return "LEX_CLOSEPARENTHESIS";
+        case LEX_OPENBRACE           : return "LEX_OPENBRACE";       
+        case LEX_CLOSEBRACE          : return "LEX_CLOSEBRACE";      
+        //case OPENBRACKET             : return "OPENBRACKET";     
+        //case CLOSEBRACKET            : return "CLOSEBRACKET";    
+        //case OPENCHEVRON             : return "OPENCHEVRON";     
+        //case CLOSECHEVRON            : return "CLOSECHEVRON";    
+        case LEX_RETURN_KEYWORD      : return "LEX_RETURN_KEYWORD";          
+        case LEX_NUMBER              : return "LEX_NUMBER";     
+        case LEX_NEGATION            : return "LEX_NEGATION";
+        case LEX_BITWISE_COMPLEMENT  : return "LEX_BITWISE_COMPLEMENT";
+        case LEX_LOGICAL_NEGATION    : return "LEX_LOGICAL_NEGATION";   
+        case LEX_SEMICOLON           : return "LEX_SEMICOLON";      
+        case LEX_END_OF_FILE         : return "LEX_END_OF_FILE"; 
+#if 1//DEBUG
+        default: printf("Lexer Type not defined.\n");exit(-1);
+#endif       
     }
 }
 
@@ -285,6 +294,18 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
             else if(CurrentCharacter == '}')
             {
                 TokenIndex->NextToken->TokenType = LEX_CLOSEBRACE;
+            }
+            else if(CurrentCharacter == '-')
+            {
+                TokenIndex->NextToken->TokenType = LEX_NEGATION;
+            }
+            else if(CurrentCharacter == '~')
+            {
+                TokenIndex->NextToken->TokenType = LEX_BITWISE_COMPLEMENT;
+            }
+            else if(CurrentCharacter == '!')
+            {
+                TokenIndex->NextToken->TokenType = LEX_LOGICAL_NEGATION;
             }
 
             TokenIndex = TokenIndex->NextToken;
@@ -487,11 +508,11 @@ int main(int ArgumentCount, char** ArgumentValues)
     // --------------------------- Lexer ---------------------------
     token *TokensHead;
     TokensHead = Lexer(SourceCode, SourceFileSize);
-#if 0//DEBUG
+#if 1//DEBUG
     for(token *TokenIndex = TokensHead->NextToken; TokenIndex->TokenType != LEX_END_OF_FILE; TokenIndex = TokenIndex->NextToken)
     {
         char *TypeString = TokenTypeToString(TokenIndex->TokenType);
-        printf("[Lexer]:   Id: %d,   Line: %d,   type:%16s,   value: `%s`\n", 
+        printf("[Lexer]:   Id: %2d,   Line: %d,   type:%22s,   value: `%s`\n", 
                TokenIndex->Id, TokenIndex->LineNumber, TypeString, TokenIndex->Lexeme);
     }
 #endif
@@ -500,7 +521,7 @@ int main(int ArgumentCount, char** ArgumentValues)
     // --------------------------- Parser ---------------------------
     ast *ASTRoot;
     ASTRoot = Parser(TokensHead);
-#if 1//DEBUG
+#if 0//DEBUG
     printf("[Parser]:\n");
     PrettyPrintAST(ASTRoot, 0);
 #endif
@@ -508,7 +529,7 @@ int main(int ArgumentCount, char** ArgumentValues)
 
     // --------------------------- Code Generator ---------------------------
     char *GeneratedAssemblyCode = Generator(ASTRoot);
-#if 1//DEBUG
+#if 0//DEBUG
     printf("[Code Generator]:\n");
     printf("%s", GeneratedAssemblyCode);
 #endif
