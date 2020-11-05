@@ -48,7 +48,8 @@ typedef enum
     AST_PROGRAM,
     AST_FUNCTION_DEFINITION,
     AST_STATEMENT,
-    AST_EXPRESSION
+    AST_EXPRESSION,
+    AST_NUMBER
 } ast_type;
 
 typedef struct AST_FUNCTION_DEFINITION_STRUCT
@@ -56,12 +57,18 @@ typedef struct AST_FUNCTION_DEFINITION_STRUCT
     char *FunctionName;
 } ast_function_definition_struct;
 
+typedef struct AST_NUMBER_STRUCT
+{
+    int Number;
+} ast_number_struct;
+
 typedef struct AST_STRUCT
 {
     ast_type ASTType;
     union
     {
-        ast_function_definition_struct ASTFuntionDefinitionStruct;     
+        ast_function_definition_struct ASTFuntionDefinitionStruct; 
+        ast_number_struct ASTNumberStruct;
     };
     struct AST_STRUCT *Child;
 } ast;
@@ -196,6 +203,10 @@ char * ASTTypeToString(int Type)
         case AST_FUNCTION_DEFINITION : return "AST_FUNCTION_DEFINITION";
         case AST_STATEMENT           : return "AST_STATEMENT";
         case AST_EXPRESSION          : return "AST_EXPRESSION";
+        case AST_NUMBER              : return "AST_NUMBER";
+#if 1//DEBUG
+        default: printf("AST Type not defined.\n");exit(-1);
+#endif
     }
 }
 
@@ -336,7 +347,7 @@ void Parser_AdvanceAndVerifyToken(token **Token, token_type TokenType)
     }
 }
 
-ast *Parser_ParseExpression(token **Tokens)
+ast *Parser_ParseNumber(token **Tokens)
 {
     Parser_AdvanceAndVerifyToken(Tokens, LEX_NUMBER);
 
@@ -348,7 +359,17 @@ ast *Parser_ParseExpression(token **Tokens)
         exit(-1);
     }
 
+    ast *AST = AllocateNewAST(AST_NUMBER);
+    AST->ASTNumberStruct.Number = Number;
+    return AST;
+}
+
+ast *Parser_ParseExpression(token **Tokens)
+{
+    //Parser_AdvanceAndVerifyToken(Tokens, LEX_NUMBER);
+
     ast *AST = AllocateNewAST(AST_EXPRESSION);
+    AST->Child = Parser_ParseNumber(Tokens);
 
     return AST;
 }
@@ -415,10 +436,14 @@ char *Generator(ast *AST)
     if(AST)
     {
         char *FurtherAssemblyCode = (char*)calloc(25, sizeof(char));
-        if(AST->ASTType == AST_EXPRESSION)
+        if(AST->ASTType == AST_NUMBER)
         {
-            sprintf(FurtherAssemblyCode, "    mov $2, %%eax\n    ret\n");
+            sprintf(FurtherAssemblyCode, "    mov $%d, %%eax\n    ret\n", AST->ASTNumberStruct.Number);
             StringConcatenate(AssemblyCode, FurtherAssemblyCode);
+        }
+        else if(AST->ASTType == AST_EXPRESSION)
+        {
+
         }
         else if(AST->ASTType == AST_FUNCTION_DEFINITION)
         {
@@ -436,9 +461,6 @@ char *Generator(ast *AST)
     }
 
     return AssemblyCode;
-    
-    /*sprintf(AssemblyCode, ".globl main\nmain:\nmov $%d, %%eax\nret\n", 2);
-    return AssemblyCode;*/
 }
 
 int main(int ArgumentCount, char** ArgumentValues) 
