@@ -141,17 +141,23 @@ int IsStringANumber(char *String)
     return 1;
 }
 
-int StringToNumber(char *String)
+int StringToNumber(int *Number, char *String)
 {
-    int Number = 0;
+    *Number = 0;
+    int IntMax32 = 0x7fffffff; // 2147483647 4294967295
 
     for(int Index = 0; String[Index]; Index++)
     {
         char CurrentCharacter = String[Index];
-        Number = Number*10 + CurrentCharacter - '0';
+        int CurrentDigit = CurrentCharacter - '0';
+        if(*Number*10 > IntMax32 - CurrentDigit)
+        {
+            return 0;
+        }
+        *Number = *Number*10 + CurrentDigit;
     }
 
-    return Number;
+    return 1;
 }
 
 void StringConcatenate(char *String1, char *String2)
@@ -174,7 +180,7 @@ char * TokenTypeToString(int Type)
         //case CLOSEBRACKET     : return "CLOSEBRACKET";    
         //case OPENCHEVRON      : return "OPENCHEVRON";     
         //case CLOSECHEVRON     : return "CLOSECHEVRON";    
-        case LEX_RETURN_KEYWORD           : return "LEX_RETURN_KEYWORD";          
+        case LEX_RETURN_KEYWORD   : return "LEX_RETURN_KEYWORD";          
         case LEX_NUMBER           : return "LEX_NUMBER";        
         case LEX_SEMICOLON        : return "LEX_SEMICOLON";      
         case LEX_END_OF_FILE      : return "LEX_END_OF_FILE";        
@@ -334,7 +340,13 @@ ast *Parser_ParseExpression(token **Tokens)
 {
     Parser_AdvanceAndVerifyToken(Tokens, LEX_NUMBER);
 
-    int Number = StringToNumber((*Tokens)->Lexeme);
+    int Number;
+    if(!StringToNumber(&Number, (*Tokens)->Lexeme))
+    {
+        printf("[Parser]: In file %s at line:%d error at `%s`\n          Bit overflow: Entered number has exceeded the max value of int.\n",
+                __FILE__, (*Tokens)->LineNumber, (*Tokens)->Lexeme);
+        exit(-1);
+    }
 
     ast *AST = AllocateNewAST(AST_EXPRESSION);
 
