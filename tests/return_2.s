@@ -1,4 +1,4 @@
     .globl main
 main:
-    mov $2, %eax
+    mov $1, %eax
     ret

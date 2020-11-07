@@ -47,12 +47,15 @@ token *AllocateNewToken()
 
 typedef enum
 {
-    AST_NOP,
-    AST_PROGRAM,
-    AST_FUNCTION_DEFINITION,
-    AST_STATEMENT,
-    AST_EXPRESSION,
-    AST_NUMBER
+    AST_NOP_TYPE,
+    AST_PROGRAM_TYPE,
+    AST_FUNCTION_DEFINITION_TYPE,
+    AST_STATEMENT_TYPE,
+    AST_EXPRESSION_TYPE,
+    AST_NUMBER_TYPE,
+    AST_NEGATION_TYPE,           // -
+    AST_BITWISE_COMPLEMENT_TYPE, // ~
+    AST_LOGICAL_NEGATION_TYPE    // !
 } ast_type;
 
 typedef struct AST_FUNCTION_DEFINITION_STRUCT
@@ -81,7 +84,7 @@ ast *AllocateNewAST(ast_type ASTType)
     ast *AST = (ast *)calloc(1, sizeof(struct AST_STRUCT));
 
     AST->ASTType = ASTType;
-    if(AST->ASTType == AST_FUNCTION_DEFINITION)
+    if(AST->ASTType == AST_FUNCTION_DEFINITION_TYPE)
     {
         //AST->ASTFuntionDefinitionStruct.FunctionName = "hello"; 
     }
@@ -207,12 +210,15 @@ char * ASTTypeToString(int Type)
 {
     switch (Type)
     { 
-        case AST_NOP                 : return "AST_NOP";
-        case AST_PROGRAM             : return "AST_PROGRAM";
-        case AST_FUNCTION_DEFINITION : return "AST_FUNCTION_DEFINITION";
-        case AST_STATEMENT           : return "AST_STATEMENT";
-        case AST_EXPRESSION          : return "AST_EXPRESSION";
-        case AST_NUMBER              : return "AST_NUMBER";
+        case AST_NOP_TYPE                 : return "AST_NOP_TYPE";
+        case AST_PROGRAM_TYPE             : return "AST_PROGRAM_TYPE";
+        case AST_FUNCTION_DEFINITION_TYPE : return "AST_FUNCTION_DEFINITION_TYPE";
+        case AST_STATEMENT_TYPE           : return "AST_STATEMENT_TYPE";
+        case AST_EXPRESSION_TYPE          : return "AST_EXPRESSION";
+        case AST_NUMBER_TYPE              : return "AST_NUMBER";
+        case AST_NEGATION_TYPE            : return "AST_NEGATION_TYPE";
+        case AST_BITWISE_COMPLEMENT_TYPE  : return "AST_BITWISE_COMPLEMENT_TYPE";
+        case AST_LOGICAL_NEGATION_TYPE    : return "AST_LOGICAL_NEGATION_TYPE";
 #if 1//DEBUG
         default: printf("AST Type not defined.\n");exit(-1);
 #endif
@@ -356,9 +362,25 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
     return TokensHead;
 }
 
-void Parser_AdvanceAndVerifyToken(token **Token, token_type TokenType)
+int IsItAUnaryToken(token_type TokenType)
+{
+    if(
+        TokenType == LEX_NEGATION || 
+        TokenType == LEX_BITWISE_COMPLEMENT || 
+        TokenType == LEX_LOGICAL_NEGATION)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+void Parser_AdvanceToken(token **Token)
 {
     *Token = (*Token)->NextToken;
+}
+
+int Parser_VerifyToken(token **Token, token_type TokenType)
+{
     if((*Token)->TokenType != TokenType)
     {
         printf("[Parser]: In file %s at line:%d error at `%s`\n          Expected token type: %s and it is: %s i.e. %s\n",
@@ -366,12 +388,17 @@ void Parser_AdvanceAndVerifyToken(token **Token, token_type TokenType)
                 TokenTypeToString(TokenType), TokenTypeToString((*Token)->TokenType), (*Token)->Lexeme);
         exit(-1);
     }
+    return 1;
+}
+
+int Parser_AdvanceAndVerifyToken(token **Token, token_type TokenType)
+{
+    Parser_AdvanceToken(Token);
+    return Parser_VerifyToken(Token, TokenType);
 }
 
 ast *Parser_ParseNumber(token **Tokens)
 {
-    Parser_AdvanceAndVerifyToken(Tokens, LEX_NUMBER);
-
     int Number;
     if(!StringToNumber(&Number, (*Tokens)->Lexeme))
     {
@@ -380,27 +407,64 @@ ast *Parser_ParseNumber(token **Tokens)
         exit(-1);
     }
 
-    ast *AST = AllocateNewAST(AST_NUMBER);
+    ast *AST = AllocateNewAST(AST_NUMBER_TYPE);
     AST->ASTNumberStruct.Number = Number;
     return AST;
 }
 
+ast *Parser_ParseUnaryOperator(token_type TokenType)
+{
+    ast *AST;
+    if(TokenType == LEX_NEGATION) // -
+    {
+        AST = AllocateNewAST(AST_NEGATION_TYPE);
+    }
+    else if(TokenType == LEX_BITWISE_COMPLEMENT) // ~
+    {
+        AST = AllocateNewAST(AST_BITWISE_COMPLEMENT_TYPE);
+    }
+    else if(TokenType == LEX_LOGICAL_NEGATION) // !
+    {
+        AST = AllocateNewAST(AST_LOGICAL_NEGATION_TYPE);
+    }
+    return AST;  
+}
+
 ast *Parser_ParseExpression(token **Tokens)
 {
-    //Parser_AdvanceAndVerifyToken(Tokens, LEX_NUMBER);
+    Parser_AdvanceToken(Tokens);
+    token_type TokenType = (*Tokens)->TokenType;
+    if(TokenType == LEX_NUMBER)
+    {
+        Parser_VerifyToken(Tokens, LEX_NUMBER);
+        return Parser_ParseNumber(Tokens);
+    }
+    else if(IsItAUnaryToken(TokenType))
+    {
+        token_type NextTokenType = (*Tokens)->NextToken->TokenType;
+        if(NextTokenType != LEX_NUMBER && !IsItAUnaryToken(NextTokenType))
+        {
+            
+        }
+        ast* UnarAST = Parser_ParseUnaryOperator(TokenType);
+        UnarAST->Child = Parser_ParseExpression(Tokens);
+        return UnarAST;
+    }
+    else
+    {
+        printf("[Parser_ParseExpression]: Undefined token type\n");
+    }
 
-    ast *AST = AllocateNewAST(AST_EXPRESSION);
-    AST->Child = Parser_ParseNumber(Tokens);
-
-    return AST;
 }
 
 ast *Parser_ParseStatement(token **Tokens)
 {
     Parser_AdvanceAndVerifyToken(Tokens, LEX_RETURN_KEYWORD);
 
-    ast *AST = AllocateNewAST(AST_STATEMENT);
-    AST->Child = Parser_ParseExpression(Tokens);
+    ast *AST = AllocateNewAST(AST_STATEMENT_TYPE);
+    ast *ASTE = AllocateNewAST(AST_EXPRESSION_TYPE);
+    ASTE = Parser_ParseExpression(Tokens);
+    AST->Child = ASTE;
 
     Parser_AdvanceAndVerifyToken(Tokens, LEX_SEMICOLON);
 
@@ -409,7 +473,7 @@ ast *Parser_ParseStatement(token **Tokens)
 
 ast *Parser_ParseFunction(token **Tokens)
 {
-    ast *AST = AllocateNewAST(AST_FUNCTION_DEFINITION);
+    ast *AST = AllocateNewAST(AST_FUNCTION_DEFINITION_TYPE);
 
     Parser_AdvanceAndVerifyToken(Tokens, LEX_INT_KEYWORD);
     Parser_AdvanceAndVerifyToken(Tokens, LEX_IDENTIFIER);
@@ -427,7 +491,7 @@ ast *Parser_ParseFunction(token **Tokens)
 
 ast *Parser(token *Tokens)
 {
-    ast *ASTRoot = AllocateNewAST(AST_PROGRAM);
+    ast *ASTRoot = AllocateNewAST(AST_PROGRAM_TYPE);
     ASTRoot->Child = Parser_ParseFunction(&Tokens);
 
     return ASTRoot;
@@ -437,13 +501,36 @@ void PrettyPrintAST(ast *AST, int Indent)
 {
     if(AST)
     {
-        char *TypeString = ASTTypeToString(AST->ASTType);
-        for(int IndentIndex = 0; Indent>1 && IndentIndex < Indent*4; IndentIndex++)
+        for(int IndentIndex = 0; IndentIndex < (Indent-1)*4; IndentIndex++)
         {
             printf(" ");
         }
         if(Indent) printf("\u2514\u2500\u2500\u2500");
-        printf("%s\n", TypeString);
+        if(AST->ASTType == AST_FUNCTION_DEFINITION_TYPE)
+        {
+            printf("fun: %s\n", AST->ASTFuntionDefinitionStruct.FunctionName);
+        }
+        else if(AST->ASTType == AST_NUMBER_TYPE)
+        {
+            printf("num: %d\n", AST->ASTNumberStruct.Number);
+        }
+        else if(AST->ASTType == AST_NEGATION_TYPE)
+        {
+            printf("negation: -\n");
+        }
+        else if(AST->ASTType == AST_BITWISE_COMPLEMENT_TYPE)
+        {
+            printf("bit comp: ~\n");
+        }
+        else if(AST->ASTType == AST_LOGICAL_NEGATION_TYPE)
+        {
+            printf("logical neg: !\n");
+        }
+        else 
+        {
+            char *TypeString = ASTTypeToString(AST->ASTType);
+            printf("%s\n", TypeString);
+        }
         PrettyPrintAST(AST->Child, Indent + 1);
     }
 
@@ -457,21 +544,21 @@ char *Generator(ast *AST)
     if(AST)
     {
         char *FurtherAssemblyCode = (char*)calloc(25, sizeof(char));
-        if(AST->ASTType == AST_NUMBER)
+        if(AST->ASTType == AST_NUMBER_TYPE)
         {
             sprintf(FurtherAssemblyCode, "    mov $%d, %%eax\n    ret\n", AST->ASTNumberStruct.Number);
             StringConcatenate(AssemblyCode, FurtherAssemblyCode);
         }
-        else if(AST->ASTType == AST_EXPRESSION)
+        else if(AST->ASTType == AST_EXPRESSION_TYPE)
         {
 
         }
-        else if(AST->ASTType == AST_FUNCTION_DEFINITION)
+        else if(AST->ASTType == AST_FUNCTION_DEFINITION_TYPE)
         {
             sprintf(FurtherAssemblyCode, "%s:\n", AST->ASTFuntionDefinitionStruct.FunctionName);
             StringConcatenate(AssemblyCode, FurtherAssemblyCode);
         }
-        else if(AST->ASTType == AST_PROGRAM)
+        else if(AST->ASTType == AST_PROGRAM_TYPE)
         {
             sprintf(FurtherAssemblyCode, "    .globl main\n");
             StringConcatenate(AssemblyCode, FurtherAssemblyCode);
@@ -521,7 +608,7 @@ int main(int ArgumentCount, char** ArgumentValues)
     // --------------------------- Parser ---------------------------
     ast *ASTRoot;
     ASTRoot = Parser(TokensHead);
-#if 0//DEBUG
+#if 1//DEBUG
     printf("[Parser]:\n");
     PrettyPrintAST(ASTRoot, 0);
 #endif
