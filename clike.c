@@ -441,10 +441,14 @@ ast *Parser_ParseExpression(token **Tokens)
     }
     else if(IsItAUnaryToken(TokenType))
     {
-        token_type NextTokenType = (*Tokens)->NextToken->TokenType;
+        token *NextToken = (*Tokens)->NextToken;
+        token_type NextTokenType = NextToken->TokenType;
         if(NextTokenType != LEX_NUMBER && !IsItAUnaryToken(NextTokenType))
         {
-            
+            printf("[Parser_ParseExpression]: In file %s at line:%d error at `%s`\n\
+                      Was expecting a unary operator or a number.\n",
+                    __FILE__, (*Tokens)->LineNumber, (*Tokens)->Lexeme);
+            exit(-1);
         }
         ast* UnarAST = Parser_ParseUnaryOperator(TokenType);
         UnarAST->Child = Parser_ParseExpression(Tokens);
@@ -463,7 +467,7 @@ ast *Parser_ParseStatement(token **Tokens)
 
     ast *AST = AllocateNewAST(AST_STATEMENT_TYPE);
     ast *ASTE = AllocateNewAST(AST_EXPRESSION_TYPE);
-    ASTE = Parser_ParseExpression(Tokens);
+    ASTE->Child = Parser_ParseExpression(Tokens);
     AST->Child = ASTE;
 
     Parser_AdvanceAndVerifyToken(Tokens, LEX_SEMICOLON);
@@ -510,6 +514,10 @@ void PrettyPrintAST(ast *AST, int Indent)
         {
             printf("fun: %s\n", AST->ASTFuntionDefinitionStruct.FunctionName);
         }
+        else if(AST->ASTType == AST_EXPRESSION_TYPE)
+        {
+            printf("exp\n");
+        }
         else if(AST->ASTType == AST_NUMBER_TYPE)
         {
             printf("num: %d\n", AST->ASTNumberStruct.Number);
@@ -537,6 +545,31 @@ void PrettyPrintAST(ast *AST, int Indent)
     return;
 }
 
+char *Generator_GenerateExpression(ast *AST)
+{
+    char *FurtherAssemblyCode = (char*)calloc(25, sizeof(char));
+    if(AST->ASTType == AST_NUMBER_TYPE)
+    {
+        sprintf(FurtherAssemblyCode, "    movl $%d, %%eax\n", AST->ASTNumberStruct.Number);
+        return FurtherAssemblyCode;
+    }
+    else if(AST->ASTType == AST_NEGATION_TYPE)
+    {
+        sprintf(FurtherAssemblyCode, "%s    neg %%eax\n", Generator_GenerateExpression(AST->Child));
+        return FurtherAssemblyCode;
+    }
+    else if(AST->ASTType == AST_BITWISE_COMPLEMENT_TYPE)
+    {
+        sprintf(FurtherAssemblyCode, "%s    not %%eax\n", Generator_GenerateExpression(AST->Child));
+        return FurtherAssemblyCode;
+    }
+    else if(AST->ASTType == AST_LOGICAL_NEGATION_TYPE)
+    {
+        sprintf(FurtherAssemblyCode, "%s    cmpl $0, %%eax\n    movl $0, %%eax\n    sete %%al\n", Generator_GenerateExpression(AST->Child));
+        return FurtherAssemblyCode;
+    }
+}
+
 char *Generator(ast *AST)
 {
     char *AssemblyCode = (char*)calloc(0, sizeof(char));
@@ -544,14 +577,21 @@ char *Generator(ast *AST)
     if(AST)
     {
         char *FurtherAssemblyCode = (char*)calloc(25, sizeof(char));
-        if(AST->ASTType == AST_NUMBER_TYPE)
+        /*if(AST->ASTType == AST_NUMBER_TYPE)
         {
             sprintf(FurtherAssemblyCode, "    mov $%d, %%eax\n    ret\n", AST->ASTNumberStruct.Number);
             StringConcatenate(AssemblyCode, FurtherAssemblyCode);
         }
-        else if(AST->ASTType == AST_EXPRESSION_TYPE)
+        else */if(AST->ASTType == AST_EXPRESSION_TYPE)
         {
-
+            sprintf(FurtherAssemblyCode, "%s    ret\n", Generator_GenerateExpression(AST->Child));
+            StringConcatenate(AssemblyCode, FurtherAssemblyCode);
+            printf("%s", AssemblyCode);
+        }
+        else if(AST->ASTType == AST_STATEMENT_TYPE)
+        {
+            //sprintf(FurtherAssemblyCode, "%s    ret\n", Generator_GenerateExpression(AST->Child));
+            //StringConcatenate(AssemblyCode, FurtherAssemblyCode);
         }
         else if(AST->ASTType == AST_FUNCTION_DEFINITION_TYPE)
         {
@@ -563,9 +603,13 @@ char *Generator(ast *AST)
             sprintf(FurtherAssemblyCode, "    .globl main\n");
             StringConcatenate(AssemblyCode, FurtherAssemblyCode);
         }
+        else
+        {
+            printf("[Generator]: Undefined %s\n", ASTTypeToString(AST->ASTType));
+        }
         FurtherAssemblyCode = Generator(AST->Child);
         StringConcatenate(AssemblyCode, FurtherAssemblyCode);
-        free(FurtherAssemblyCode);
+        //free(FurtherAssemblyCode);
     }
 
     return AssemblyCode;
@@ -616,7 +660,7 @@ int main(int ArgumentCount, char** ArgumentValues)
 
     // --------------------------- Code Generator ---------------------------
     char *GeneratedAssemblyCode = Generator(ASTRoot);
-#if 0//DEBUG
+#if 1//DEBUG
     printf("[Code Generator]:\n");
     printf("%s", GeneratedAssemblyCode);
 #endif
