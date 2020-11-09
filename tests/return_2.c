@@ -1,4 +1,4 @@
 int main ()
 {
-    return !~-55;
+    return 2-1;
 }

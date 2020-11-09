@@ -20,6 +20,9 @@ typedef enum
     LEX_NEGATION,           // -
     LEX_BITWISE_COMPLEMENT, // ~
     LEX_LOGICAL_NEGATION,   // !
+    LEX_ADDITION,           // +
+    LEX_MULTIPLICATION,     // *
+    LEX_DIVISION,           // /
     LEX_SEMICOLON,          // ;
     LEX_END_OF_FILE         // End of file
 } token_type;
@@ -197,7 +200,10 @@ char * TokenTypeToString(int Type)
         case LEX_NUMBER              : return "LEX_NUMBER";     
         case LEX_NEGATION            : return "LEX_NEGATION";
         case LEX_BITWISE_COMPLEMENT  : return "LEX_BITWISE_COMPLEMENT";
-        case LEX_LOGICAL_NEGATION    : return "LEX_LOGICAL_NEGATION";   
+        case LEX_LOGICAL_NEGATION    : return "LEX_LOGICAL_NEGATION";  
+        case LEX_ADDITION            : return "LEX_ADDITION";
+        case LEX_MULTIPLICATION      : return "LEX_MULTIPLICATION";
+        case LEX_DIVISION            : return "LEX_DIVISION"; 
         case LEX_SEMICOLON           : return "LEX_SEMICOLON";      
         case LEX_END_OF_FILE         : return "LEX_END_OF_FILE"; 
 #if 1//DEBUG
@@ -312,6 +318,18 @@ token *Lexer(char *SourceCode, int SourceCodeSize)
             else if(CurrentCharacter == '!')
             {
                 TokenIndex->NextToken->TokenType = LEX_LOGICAL_NEGATION;
+            }
+            else if(CurrentCharacter == '+')
+            {
+                TokenIndex->NextToken->TokenType = LEX_ADDITION;
+            }
+            else if(CurrentCharacter == '*')
+            {
+                TokenIndex->NextToken->TokenType = LEX_MULTIPLICATION;
+            }
+            else if(CurrentCharacter == '/')
+            {
+                TokenIndex->NextToken->TokenType = LEX_DIVISION;
             }
 
             TokenIndex = TokenIndex->NextToken;
